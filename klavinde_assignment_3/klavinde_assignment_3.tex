@@ -1,0 +1,98 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+
+library(caret) install.packages(``ggplot2'')
+install.packages(``lattice'') library(ISLR) library(e1071)
+library(dplyr) library(fnn) universal.bank.df
+\textless-read.csv(``UniversalBank.csv'') summary(universal.bank.df)
+\#Isolate Online, Credit Card, and Loan
+MyData\textless-select(universal.bank.df,Personal.Loan,Online,CreditCard)
+summary(MyData) set.seed(123) \#Divide data into test and train
+Index\_Train\textless-createDataPartition(MyData\(Personal.Loan, p=0.6, list=FALSE) Train.df <-MyData[Index_Train,] Valid.df <-MyData[-Index_Train,] #create Pivot Table for Online to CC and Loan summary(Train.df) install.packages("MASS") install.packages("reshape2") install.packages("reshape") library(MASS) library(reshape2) library(reshape) Train.m1 = melt(Train.df, id=c("CreditCard","Personal.Loan"),  measure= c("Online")) Train.m1 Train.c1 = cast(Train.m1, CreditCard ~ Personal.Loan, subset=variable=="Online",  margins=c("grand_row","grand_col"), sum) Train.c1 table(Train.m1) p.cc1loan1online1 <-57/3000*100 ##The Probability that a borrower uses online and has a cc with bank and will accept loan is 1.9% Train.Loan2Online = melt(Train.df, id=c("Personal.Loan"),  measure=c("Online")) table(Train.Loan2Online) ##This table compares personal loan to online user data. Train.Loan2CC = melt(Train.df, id=c("Personal.Loan"),  measure=c("CreditCard")) table(Train.Loan2CC) ##This table compares personal load to credit card user data. #i. P(CC = 1 | Loan =1) p.cc1.loan1 <-91/3000*100 # i.probablility is 3.033% for having cc and accepting loan # ii. P(Online = 1 | Loan =1) p.online1.loan1 <-179/3000*100 # ii.probablility is 5.966% for using online and accepting loan #iii. P(Loan =1) Train.Loan = Train.df
+\)Personal.Loan table(Train.Loan) p.loan1 \textless-278/3000\emph{100
+\#iii. probability is 9.266\% overall that loan is accepted (from
+training data) \#iv. P(CC = 1 \textbar{} Loan = 0) p.cc1.loan0
+\textless-792/3000}100 \#iv. probability is 26.4\% that have cc but
+decline loan \#v. P(Online = 1 \textbar{} Loan = 0) p.online1.loan0
+\textless-1620/3000\emph{100 \#v. probability is 54\% for using online
+but decline loan. \#vi. P(Loan =0) p.loan0 \textless-2722/3000}100 \#vi.
+probability is 90.73\% that loan is declined (from training data)
+library(``gmodels'') install.packages(``naivebayes'') nb\_model
+\textless-naiveBayes(Personal.Loan \textasciitilde{}
+Online+CreditCard,data=Train.df) nb\_model Predicted\_Test\_labels
+\textless- predict(nb\_model,Valid.df) library(``gmodels'')
+CrossTable(x=Valid.df\(Personal.Loan,y=Predicted_Test_labels, prop.chisq = TRUE) CrossTable(x=Valid.df\)Personal.Loan,y=Predicted\_Test\_labels,
+prop.chisq = FALSE) Predicted\_Test\_labels
+\textless-predict(nb\_model,Valid.df, type = ``raw'')
+head(Predicted\_Test\_labels) library(pROC)
+roc(Valid.df\(Personal.Loan, Predicted_Test_labels[,2]) plot.roc(Valid.df\)Personal.Loan,Predicted\_Test\_labels{[},2{]})
+
+\end{document}

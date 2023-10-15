@@ -1,0 +1,80 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+library(caret)
+install.packages("ggplot2")
+install.packages("lattice")
+library(ISLR)
+library(e1071)
+library(dplyr)
+library(fnn)
+universal.bank.df <-read.csv("UniversalBank.csv")
+summary(universal.bank.df)
+#Isolate Online, Credit Card, and Loan
+MyData<-select(universal.bank.df,Personal.Loan,Online,CreditCard)
+summary(MyData)
+set.seed(123)
+#Divide data into test and train
+Index_Train<-createDataPartition(MyData$Personal.Loan, p=0.6, list=FALSE)
+Train.df <-MyData[Index_Train,]
+Valid.df  <-MyData[-Index_Train,]
+#create Pivot Table for Online to CC and Loan
+summary(Train.df)
+install.packages("MASS") 
+install.packages("reshape2") 
+install.packages("reshape") 
+library(MASS) 
+library(reshape2) 
+library(reshape) 
+Train.m1 = melt(Train.df, id=c("CreditCard","Personal.Loan"),
+             measure= c("Online"))
+Train.m1
+Train.c1 = cast(Train.m1, CreditCard ~ Personal.Loan, subset=variable=="Online",
+                margins=c("grand_row","grand_col"), sum)
+Train.c1
+table(Train.m1)
+p.cc1loan1online1 <-57/3000*100
+##The Probability that a borrower uses online and has a cc with bank and will accept loan is 1.9%
+Train.Loan2Online = melt(Train.df, id=c("Personal.Loan"),
+                measure=c("Online"))
+table(Train.Loan2Online)
+##This table compares personal loan to online user data.
+Train.Loan2CC = melt(Train.df, id=c("Personal.Loan"),
+                measure=c("CreditCard"))
+table(Train.Loan2CC)
+##This table compares personal load to credit card user data.
+#i. P(CC = 1 | Loan =1)
+p.cc1.loan1 <-91/3000*100
+# i.probablility is 3.033% for having cc and accepting loan
+# ii. P(Online = 1 | Loan =1)
+p.online1.loan1 <-179/3000*100
+# ii.probablility is 5.966% for using online and accepting loan
+#iii. P(Loan =1)
+Train.Loan = Train.df$Personal.Loan
+table(Train.Loan)
+p.loan1 <-278/3000*100
+#iii. probability is 9.266% overall that loan is accepted (from training data)
+#iv. P(CC = 1 | Loan = 0)
+p.cc1.loan0 <-792/3000*100
+#iv. probability is 26.4% that have cc but decline loan
+#v. P(Online = 1 | Loan = 0)
+p.online1.loan0 <-1620/3000*100
+#v. probability is 54% for using online but decline loan.
+#vi. P(Loan =0)
+p.loan0 <-2722/3000*100
+#vi. probability is 90.73% that loan is declined (from training data)
+library("gmodels")
+install.packages("naivebayes")
+nb_model <-naiveBayes(Personal.Loan ~ Online+CreditCard,data=Train.df)
+nb_model
+Predicted_Test_labels <- predict(nb_model,Valid.df)
+library("gmodels")
+CrossTable(x=Valid.df$Personal.Loan,y=Predicted_Test_labels, prop.chisq = TRUE)
+CrossTable(x=Valid.df$Personal.Loan,y=Predicted_Test_labels, prop.chisq = FALSE)
+Predicted_Test_labels <-predict(nb_model,Valid.df, type = "raw")
+head(Predicted_Test_labels)
+library(pROC)
+roc(Valid.df$Personal.Loan, Predicted_Test_labels[,2])
+plot.roc(Valid.df$Personal.Loan,Predicted_Test_labels[,2])
