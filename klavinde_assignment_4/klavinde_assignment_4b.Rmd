@@ -1,0 +1,94 @@
+---
+title: "klavinde_assignment_4"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+##install.packages("tidyverse")
+library(tidyverse) 
+##install.packages("factoextra")
+library(factoextra)
+library(ISLR)
+set.seed(123)
+pharm.data<-read.csv("Pharmaceuticals.csv")
+pharm.trim.data<-pharm.data[,c(3,4,5,6,7,8,9,10,11)]
+summary(pharm.trim.data)
+df <- scale(pharm.trim.data)
+distance <- get_dist(df)
+fviz_dist(distance)
+fviz_nbclust(df, kmeans, method = "wss")
+```
+```{r}
+fviz_nbclust(df, kmeans, method = "gap_stat")
+```
+```{r}
+fviz_nbclust(df, kmeans, method = "silhouette")
+```
+
+# QUESTION A. See Below
+
+### The WSS elbow is more gradual than the example given in class however it appears that 5 or 6 clusters would be appropriate. 
+
+### The Silhouette identifies 5 clusters being optimal.
+
+### Continue with using 5 clusters
+```{r}
+k5 <- kmeans(df, centers = 5, nstart = 21)
+k5$centers
+```
+# QUESTION B. See below
+
+###  Cluster 1 has the highest Price/earnigns. 
+
+###  Cluster 2 grouped the higher estimated revenue growth
+
+###  Cluster 3 appears to be just well diversified, as in a safer portfolio.
+
+###  Cluster 4 is the highest Beta center. 
+
+###  Cluster 5 has the companies with the highest Market Capitalization
+```{r}
+k5$size
+```
+###  Cluster 3 also has the highest number of companies (cluster size).
+```{r}
+fviz_cluster(k5, data = df)
+```
+
+# QUESTION C. 
+
+##Tracing all of the groups back to the .csv table, there does not appear to be a consistent Median Recommendation in the clusters.
+
+### Cluster 3 appears to have the safest diversification of median recommendations.
+
+### Cluster 4 contains companies from each stock exchange (col 12: NSYE, NASDAQ, AMEX), diversifying in that way. 
+
+
+
+
+# Question D. see below
+
+### Cluster 1: "Best Price/Earnings Ratios"
+
+### Cluster 2: "Best Revenue Growth Companies"
+
+### Cluster 3: "Most Diversified and Safe Portfolio"
+
+### Cluster 4: "Best Beta, Diversified Stock Exchanges"
+
+### Cluster 5: "Best Market Capitalization"
+
+## Below gives a visual of the centers for each cluster
+
+```{r}
+plot(c(0), xaxt = 'n', ylab = "", type = "l", 
+     ylim = c(min(k5$centers), max(k5$centers)), xlim = c(0, 9))
+axis(1, at = c(1:9), labels = names(df))
+for (i in c(1:9))
+lines(k5$centers[,i], lty = i, lwd = 2, col = ifelse(i %in% c(0,1),
+                            "black", "dark grey"))
+text(x = 0.2, y = k5$centers[, 1], labels = paste("Cluster", c(1:5)))
+```
+
+### Notebook wont put the lines if "lines(k5$centers[i,]," but they appear correct on RStudio. Line 86 has an unknown error but plots something if re-written as above. 
