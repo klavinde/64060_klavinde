@@ -1,0 +1,189 @@
+---
+title: "klavinde_assignment_5b"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)
+library(factoextra)
+library(ISLR)
+set.seed(123)
+cereals.df <- read.csv("cereals.csv")
+row.names(cereals.df) <- cereals.df[,1]
+cereals.data <- cereals.df[,c(4,5,6,8,9,10,11,12)]
+summary(cereals.data)
+```
+
+### Using only two variables, Calories and Sugars
+```{r}
+d <- dist(cereals.data, method = "euclidean")
+d.norm <- dist(cereals.data[,c(1,8)], method = "euclidean")
+cereals.df.norm <- sapply(cereals.data, scale)
+row.names(cereals.df.norm) <- row.names(cereals.data)
+d.norm <- dist(cereals.df.norm[,c(1,8)], method = "euclidean")
+```
+
+### QUESTION 1. Apply hierarchical clustering to the data using Euclidean distance to the normalized
+### measurements. Use Agnes to compare the clustering from single linkage, complete
+### linkage, average linkage, and Ward. Choose the best method.
+### Compare single linkage, average linkage, complete linkage, and Ward
+
+## a. Using all Variables, Single method
+```{r}
+d.norm <- dist(cereals.df.norm, method = "euclidean")
+hc1 <- hclust(d.norm, method = "single")
+memb1 <- cutree(hc1, k = 9)
+row.names(cereals.df.norm) <- paste(memb1, ": ", row.names(cereals.data), sep = "")
+```
+
+## b. Using all Variables, Average method
+```{r}
+d.norm <- dist(cereals.df.norm, method = "euclidean")
+hc2 <- hclust(d.norm, method = "average")
+memb2 <- cutree(hc2, k = 9)
+row.names(cereals.df.norm) <- paste(memb2, ": ", row.names(cereals.data), sep = "")
+```
+
+## c. Using all Variables, Complete method
+```{r}
+d.norm <- dist(cereals.df.norm, method = "euclidean")
+hc3 <- hclust(d.norm, method = "complete")
+memb3 <- cutree(hc3, k = 9)
+row.names(cereals.df.norm) <- paste(memb3, ": ", row.names(cereals.data), sep = "")
+```
+
+## d. Using all Variables, WARD method
+```{r}
+d.norm <- dist(cereals.df.norm, method = "euclidean")
+hc4 <- hclust(d.norm, method = "ward.D")
+memb4 <- cutree(hc4, k = 9)
+row.names(cereals.df.norm) <- paste(memb4, ": ", row.names(cereals.data), sep = "")
+```
+
+## SINGLE; H-Cluster
+```{r}
+fviz_dend(x = hc1, cex = 0.4, lwd = 0.7, k = 9,
+          k_colors = c("jco"),
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+```
+
+## AVERAGE; H-Cluster
+```{r}
+fviz_dend(x = hc2, cex = 0.4, lwd = 0.7, k = 9,
+          k_colors = c("jco"),
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE) 
+```
+
+## COMPLETE; H-Cluster
+```{r}
+fviz_dend(x = hc3, cex = 0.4, lwd = 0.7, k = 9,
+          k_colors = c("jco"),
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+```
+
+## WARD; H-Cluster
+```{r}
+fviz_dend(x = hc4, cex = 0.4, lwd = 0.7, k = 9,
+          k_colors = c("jco"),
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+```
+
+### Question 2. 9 Clusters. Using the Ward method and considering 8 variables, stopping at 9 Clusters down would be best. Beyond that doesn't appear meaningful.
+
+
+## H-Cluster Heat Map of Normalized Cereal Data
+```{r}
+heatmap(as.matrix(cereals.df.norm), Colv = NA, hclustfun = hclust, 
+        col=rev(paste("gray",1:99,sep="")))
+```
+
+## Question 4: 
+### The Heat Map provides a useful visual for determining most healthy cereals.
+### The Labels show the clusters from Ward method. Cluster 1 is high in fiber, low calories, 
+### moderate sugar. However the most well-rounded nutritionally is Cluster 5. This cluster 
+### is low in fat and sugar, moderate in most everything else. 
+### The data should be normalized as the units are not the same and there 
+### are inverse relationships present (e.g. sugars low, vitamins high).
+
+# Question 3. 
+### Partitioned by calories into Training and Validation datasets.
+```{r}
+library(caret)
+set.seed(10)
+Train_Index = createDataPartition(cereals.data$calories, p=0.6, list = FALSE)
+Train_Data = cereals.data[Train_Index, ]
+Validation_Data = cereals.data[-Train_Index, ]
+TraVal_Data = cereals.data
+```
+```{r}
+summary(Train_Data)
+```
+```{r}
+summary(Validation_Data)
+```
+
+```{r}
+train.d <- dist(Train_Data, method = "euclidean")
+train.df.norm <- sapply(Train_Data, scale)
+row.names(train.df.norm) <- row.names(Train_Data)
+
+train.dist.norm <- dist(train.df.norm, method = "euclidean")
+train.hc.a <- hclust(train.dist.norm, method = "ward.D")
+train.memb <- cutree(train.hc.a, k = 9)
+row.names(train.df.norm) <- paste(train.memb, ": ", row.names(Train_Data), sep = "")
+
+fviz_dend(x = train.hc.a, cex = 0.4, lwd = 0.7, k = 9,
+          k_colors = c("jco"),
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+```
+
+
+```{r}
+valid.d <- dist(Validation_Data, method = "euclidean")
+valid.df.norm <- sapply(Validation_Data, scale)
+row.names(valid.df.norm) <- row.names(Validation_Data)
+
+valid.dist.norm <- dist(valid.df.norm, method = "euclidean")
+valid.hc.a <- hclust(valid.dist.norm, method = "ward.D")
+valid.memb <- cutree(valid.hc.a, k = 9)
+row.names(valid.df.norm) <- paste(valid.memb, ": ", row.names(Validation_Data), sep = "")
+
+fviz_dend(x = valid.hc.a, cex = 0.4, lwd = 0.7, k = 9,
+          k_colors = c("jco"),
+          rect = TRUE, 
+          rect_border = "jco", 
+          rect_fill = TRUE)
+```
+
+
+```{r}
+heatmap(as.matrix(valid.df.norm), Colv = NA, hclustfun = hclust, 
+        col=rev(paste("gray",1:99,sep="")))
+```
+
+
+```{r}
+heatmap(as.matrix(train.df.norm), Colv = NA, hclustfun = hclust, 
+        col=rev(paste("gray",1:99,sep="")))
+heatmap(as.matrix(cereals.df.norm), Colv = NA, hclustfun = hclust, 
+        col=rev(paste("gray",1:99,sep="")))
+```
+
+### Looking at the heatmaps of the two partitions, the division split 
+### the original Cluster 5 equally. Running via the Ward method clusters the 
+### same cereals together: Cluster 4 in the Training data and Cluster 6 in 
+### the Validation data, but they include additional cereals in those 
+### clusters. Therefore I would presume that this method is not the most
+### stable. 
