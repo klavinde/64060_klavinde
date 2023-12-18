@@ -1,0 +1,300 @@
+---
+title: "klavinde_final_exam"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+# Cleaning Data is a large portion of initial coding.
+
+```{r}
+arpack <- c("arules","arulesViz")
+# install.packages(arpack) install if needed
+library(arules)
+library(arulesViz)
+library(tidyverse)
+library(cluster)
+library(caret)
+fuel_data.df <- read.csv("fuel_receipts_costs.csv")
+summary(fuel_data.df)
+```
+
+
+
+```{r}
+row.names(fuel_data.df) <- fuel_data.df[,1]
+fuel_numeric<-fuel_data.df%>%column_to_rownames(var = "rowid")
+summary(fuel_numeric)
+```
+
+## There are many categorical data points and some columns have a large amount of "NA" data points.
+
+```{r}
+library(tidyverse)
+library(cluster)
+summary(fuel_data.df)
+colSums(is.na(fuel_data.df))
+```
+
+
+
+## Fuel Type converted to numerical data to include in clustering
+```{r}
+fuel_numeric ["fuel_group_code"][fuel_numeric ["fuel_group_code"] == ''] <- NA
+fuel_numeric <-fuel_numeric [-which(is.na(fuel_numeric$fuel_group_code)), ]
+summary(fuel_numeric)
+fuel_numeric$fuel_group_code <- as.numeric(as.factor(fuel_numeric$fuel_group_code))
+summary(fuel_numeric)
+```
+
+## Fuel Types 1. Coal | 2. Natural Gas | 3. Other Gas | 4. Petroleum | 5. Petroleum Coke
+### Alphabetized
+
+```{r}
+fuel_numeric <- fuel_numeric[,c(10,14,15,16,17,18,19)]
+summary(fuel_numeric)
+```
+## Data Cleaned! To numerical and without N/A data points.
+```{r}
+fuel_numeric<- na.omit(fuel_numeric) %>% select_if(is.numeric)
+summary(fuel_numeric)
+```
+# Final Cleaning
+
+
+### Sampled data down to ~3000 observations using partitioning.
+```{r}
+library(caret)
+set.seed(4381)
+Fuel_Index = createDataPartition(fuel_numeric$fuel_mmbtu_per_unit, p=0.988, list = FALSE)
+Fuel_Valid = fuel_numeric[Fuel_Index, ]
+Fuel_Train = fuel_numeric[-Fuel_Index, ]
+head(Fuel_Train)
+scaled_fuel_data <- as.data.frame(scale(Fuel_Train))
+fuel_euclidean <- dist(scaled_fuel_data, method = "euclidean")
+hc <- hclust(fuel_euclidean, method="ward.D2")
+```
+
+```{r}
+methods <- c( "average", "single", "complete", "ward") 
+names(methods) <- c( "average", "single", "complete", "ward")
+ac <- function(x) {
+  agnes(scaled_fuel_data, metric = "euclidean", method = x)$ac
+}
+```
+
+
+## Ward Method is preferred for this data
+```{r}
+map_dbl(methods, ac)
+```
+
+
+#### This next step takes the most CPU
+```{r}
+hc_wards <- agnes(scaled_fuel_data, method = "ward", metric = "euclidean")
+```
+
+
+```{r}
+hc_wards
+library(factoextra)
+hc_wards_cut <- cutree(hc_wards, k=7)
+table(hc_wards_cut)
+pltree(hc_wards, cex = 0.6, hang = -1)
+rect.hclust(hc_wards, k = 7, border = 1:5)
+fviz_dend(hc_wards, cex = 0.6, k = 7)
+```
+## First Division: Right is Natural Gas, left is Coal, Petroleum, and Petroleum Coke.
+
+```{r}
+library(caret)
+library(factoextra)
+fuel_data_clustered <- mutate(scaled_fuel_data, cluster = hc_wards_cut)
+set.seed(2457)
+index <- createDataPartition(fuel_data_clustered$cluster, p = 0.7, list = FALSE)
+part_A <- fuel_data_clustered[index,]
+part_B <- fuel_data_clustered[-index,]
+```
+
+```{r}
+hc_wards_A <- agnes(part_A[,1:7], method = "ward", metric = "euclidean")
+```
+
+```{r}
+hc_cut_A <- cutree(hc_wards_A, k=7)
+part_A <- mutate(part_A, cluster = hc_cut_A)
+part_A_centroids <- aggregate(part_A[,1:7], by=list(part_A$cluster), mean) 
+colnames(part_A_centroids)[1] <- "cluster"
+cluster_prediction_B <- data.frame(data=seq(1,nrow(part_B)), Partition_B_cluster=rep(0,nrow(part_B)))
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+```
+
+```{r}
+for (i in 1:nrow(part_B)) {
+  distances <- apply(part_A_centroids[, -1], 1, function(x) euclidean(x, part_B[i,1:7]))
+  cluster_prediction_B$Partition_B_cluster[i] <- which.min(distances)
+}
+```
+
+```{r}
+cluster_prediction_B <- cluster_prediction_B %>% mutate(original_clusters = part_B$cluster)
+```
+
+```{r}
+table(cluster_prediction_B$Partition_B_cluster, cluster_prediction_B$original_clusters, dnn = c("New Cluster", "Old Cluster"))
+```
+# HEAT MAP of cleaned, normalized data. 
+```{r}
+heatmap(as.matrix(scaled_fuel_data), Colv = NA, hclustfun = hclust)
+```
+# This portion is the most useful for reports. 
+```{r}
+cluster <- hc_wards_cut
+centers <- aggregate( . ~ cluster, data = Fuel_Train, FUN = mean)
+centers
+```
+
+# Cluster 1: Dirtier Coal
+### Predominate Fuel Type: Coal
+### Quantity (1.8 % of data) 
+### Thermal Content (Very High) 
+### Sulfur Content: Moderate
+### Ash Content: High
+### Mercury Content: High
+### Fuel Cost Per thermal units $2.31
+
+# Cluster 2: Slightly Better Natural Gas
+### Predominate Fuel Type: Natural Gas
+### Quantity (4.59 % of data) 
+### Thermal Content (Low) 
+### Sulfur Content: None/Scant 
+### Ash Content: None/Scant 
+### Mercury Content: None/Scant 
+### Fuel Cost Per thermal units $7.49
+
+# Cluster 3: Petroleum 
+### Predominate Fuel Type: Petroleum 
+### Quantity (0.2 % of data) 
+### Thermal Content (Moderate) 
+### Sulfur Content: Low  
+### Ash Content: None/Scant 
+### Mercury Content: None/Scant 
+### Fuel Cost Per thermal units $16.78
+
+# Cluster 4: Standard Natural Gas
+### Predominate Fuel Type: Natural Gas 
+### Quantity (90.33 % of data)  
+### Thermal Content (Low) 
+### Sulfur Content: None/Scant  
+### Ash Content: None/Scant 
+### Mercury Content: None/Scant 
+### Fuel Cost Per thermal units $3.62
+
+# Cluster 5: Low Mercury Coal
+### Predominate Fuel Type: Coal 
+### Quantity (1.77 % of data) 
+### Thermal Content (Very High) 
+### Sulfur Content: Moderate  
+### Ash Content: Higher 
+### Mercury Content: Low
+### Fuel Cost Per thermal units $2.45
+
+# Cluster 6: High-Ash Coal
+### Predominate Fuel Type: Coal (mixed)
+### Quantity (1.27 % of data) 
+### Thermal Content (Very High) 
+### Sulfur Content: Very High
+### Ash Content: Highest 
+### Mercury Content: None/Scant 
+### Fuel Cost Per thermal units $2.37
+
+# Cluster 7: 
+### Predominate Fuel Type: Natural Gas
+### Quantity (0.013 % of data) | 
+### Thermal Content (Low, higher than other Natural Gas) 
+### Sulfur Content: None/Scant 
+### Ash Content: None/Scant 
+### Mercury Content: None/Scant  
+### Fuel Cost Per thermal units $31,052 (?? Ultra clean ??)
+
+
+
+# Below are Various Charts 
+
+## Chart of all the variables
+## Quantity of units overpowers other variables
+```{r}
+all_fuel <- centers[, c(1:8)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = all_fuel, aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("All Fuel")
+```
+
+
+
+## FUEL GROUP (TYPE)
+### Normalizing data makes fuel group chart difficult to interpret, use center data above for type of fuel. 
+### Size of bar height is indicator of type (shorter is coal, tallest is petroleum). 
+### Categorical data converted for clustering. 
+```{r}
+fuel.group.plot <- centers[, c(1,2)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = fuel.group.plot, aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("Fuel Group")
+```
+
+## FUEL RECEIVED UNITS
+### Visual of how Standard Natural Gas predominates sample
+```{r}
+fuel.received.units <- centers[, c(1,3)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = fuel.received.units, aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("Fuel Received Units")
+```
+
+## FUEL MMBTU PER UNIT
+### Clusters 1, 5 , 6 make the most heat per unit (all coal)
+```{r}
+fuel.mmbtu.per.unit <- centers[, c(1,4)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+ggplot(data = fuel.mmbtu.per.unit, aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("fuel mmbtu per unit")
+```
+
+## Sulfur Content 
+### The clusters with scant to no sulfur are hard to see on bar chart.
+```{r}
+sulfur.content.pct <- centers[, c(1,5)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = sulfur.content.pct, aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("Sulfur Content")
+```
+
+
+
+## Ash Content
+### Same as Sulfur, the natural gas clusters aren't visible. 
+```{r}
+ash.content <- centers[, c(1,6)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = ash.content , aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("Ash Content")
+```
+
+## Mercury Content
+### Predominately one cluster
+```{r}
+mercury.content <- centers[, c(1,7)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = mercury.content , aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("Mercury Content")
+```
+
+## Fuel Cost Per MMBTU
+### One type of natural gas was extremely expensive and skewed data
+### use center data above for costs.
+### Suspect there may be a special purpose natural gas that must be ultra clean.
+```{r}
+fuel.cost.per.mmbtu <- centers[, c(1,8)] %>% pivot_longer(col = !cluster, names_to = "variable", values_to = "value")
+
+ggplot(data = fuel.cost.per.mmbtu, aes(x = variable, y = value, fill = cluster)) + geom_col(colour = "black") + ggtitle("Fuel Cost Per MMBTU")
+```
+## To improve report
+### Possible further conversion of categorical data (transportation type).
+### Ensure Cost per unit is complete and accurate.
+### Eliminate blank and N/A in important columns. If none/Scant, put zero. 
